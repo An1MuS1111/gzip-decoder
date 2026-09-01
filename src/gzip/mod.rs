@@ -63,7 +63,7 @@ pub enum OperatingSystem /* OS */ {
 
 #[repr(u8)]
 enum ExtraFlags /* XFL */ {
-    MaximumConpression = 2,
+    MaximumCompression = 2,
     FastestAlgorithms = 4,
     Default(u8),
 }
