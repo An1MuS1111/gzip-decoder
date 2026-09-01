@@ -5,6 +5,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
+use miniz_oxide::inflate::decompress_to_vec;
 
 pub struct Parser<S> {
     pub buf: Bytes,
@@ -191,7 +192,14 @@ impl Parser<HeaderParsed> {
 }
 
 pub fn decode_deflate_to_bytesmut(input: &mut Bytes, output: &mut BytesMut) -> GzipResult<()> {
-    todo!("implement the Huffman algorithms to decode")
+    let decompressed = decompress_to_vec(input.as_ref()).map_err(|e| {
+        GzipError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Deflate error: {}", e),
+        ))
+    })?;
+    output.extend_from_slice(&decompressed);
+    Ok(())
 }
 
 #[cfg(test)]

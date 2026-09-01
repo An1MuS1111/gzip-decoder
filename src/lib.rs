@@ -17,7 +17,7 @@ pub mod error;
 pub mod parser;
 
 use bitflags::bitflags;
-use crc::{Crc, CRC_32_ISO_HDLC};
+use crc::{CRC_32_ISO_HDLC, Crc};
 
 pub use error::{GzipError, GzipResult};
 pub use parser::{HeaderParsed, Parser, Start};
