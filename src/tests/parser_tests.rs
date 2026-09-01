@@ -2,6 +2,14 @@ use super::*;
 use crate::error::GzipError;
 use crate::{CompressionMethod, ExtraFlags, Flags, OperatingSystem, header_crc16};
 use bytes::Bytes;
+use flate2::{Compression, write::GzEncoder};
+use std::io::Write;
+
+fn make_gzip_bytes(payload: &[u8]) -> Vec<u8> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(payload).expect("gzip payload should encode");
+    encoder.finish().expect("gzip encoder should finish")
+}
 
 #[test]
 fn test_parse_valid_header_with_fname() {
@@ -174,6 +182,52 @@ fn test_header_with_all_optional_flags_combined() {
         parsed.state.header.optionals.header_crc,
         Some(expected_crc16)
     );
+}
+
+#[test]
+fn test_parse_header_on_real_gzip_stream() {
+    let payload = b"hello from a real gzip stream\nhello again\n";
+    let compressed = make_gzip_bytes(payload);
+
+    let parsed = Parser::new(Bytes::from(compressed)).parse_header().unwrap();
+
+    assert_eq!(
+        parsed.state.header.compression_method,
+        CompressionMethod::Deflate
+    );
+    assert_eq!(parsed.state.header.flags, Flags::empty());
+    assert_eq!(parsed.state.header.modification_time, 0);
+    assert_eq!(parsed.state.header.optionals.name, None);
+    assert!(parsed.buf.len() > 0);
+}
+
+#[test]
+#[ignore = "decompress() is not implemented yet"]
+fn test_decompress_roundtrip_real_gzip_stream() {
+    let payload = b"The quick brown fox jumps over the lazy dog";
+    let compressed = make_gzip_bytes(payload);
+
+    let header = Parser::new(Bytes::from(compressed))
+        .parse_header()
+        .expect("valid gzip bytes should parse");
+    let decompressed = header.decompress().expect("gzip payload should inflate");
+
+    assert_eq!(decompressed.state.uncompressed_data.as_ref(), payload);
+    assert_eq!(decompressed.state.calculated_crc32, crate::crc32(payload));
+}
+
+#[test]
+#[ignore = "decompress() is not implemented yet"]
+fn test_decompress_empty_payload_gzip_stream() {
+    let compressed = make_gzip_bytes(b"");
+
+    let header = Parser::new(Bytes::from(compressed))
+        .parse_header()
+        .expect("valid empty gzip payload should parse");
+    let decompressed = header.decompress().expect("empty payload should inflate");
+
+    assert_eq!(decompressed.state.uncompressed_data.as_ref(), b"");
+    assert_eq!(decompressed.state.calculated_crc32, crate::crc32(b""));
 }
 
 #[test]

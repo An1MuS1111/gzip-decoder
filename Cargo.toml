@@ -10,3 +10,7 @@ memchr = "2.8.3"
 thiserror = "2.0.20"
 crc = "3.4.0"
 miniz_oxide = "0.9.1"
+
+[dev-dependencies]
+flate2 = "1.0"
+miniz_oxide = "0.9.1"
