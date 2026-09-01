@@ -1,3 +1,0 @@
-mod gzip;
-
-fn main() {}
