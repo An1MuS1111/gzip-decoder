@@ -3,13 +3,23 @@ use crate::{
     CompressionMethod, ExtraFlags, Flags, Header, ID1, ID2, OperatingSystem, Optionals, Trailer,
     crc32, header_crc16,
 };
+use bitflags::Flag;
 use bytes::{Buf, Bytes, BytesMut};
 use memchr::memchr;
 use miniz_oxide::inflate::decompress_to_vec;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
+use byteorder::{ReadBytesExt, LittleEndian};
 
 pub struct Parser<S> {
     pub buf: Bytes,
     pub state: S,
+}
+
+pub struct Decoder<R, S> {
+    pub reader: R,
+    pub state: S,
+    pub buf: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +42,65 @@ pub struct Finished {
     pub header: Header,
     pub trailer: Trailer,
     pub uncompressed_data: Vec<u8>,
+}
+
+impl<R: BufRead> Decoder<R, Start> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            reader,
+            state: Start,
+            buf: Vec::with_capacity(256),
+        }
+    }
+
+    pub fn read_header(&mut self) -> GzipResult<Decoder<R, Header>> {
+        let mut fixed_header = [0u8; 10];
+        self.reader
+            .read_exact(&mut fixed_header)
+            .map_err(|e| GzipError::UnexpectedEof {
+                err: format!("failed to read header: {}", e),
+            })?;
+
+        // verify the identification bytes ID1 & ID2
+        if fixed_header[0] != ID1 || fixed_header[1] != {
+            return Err(GzipError::InvalidMagic(fixed_header[0], fixed_header[1]))   
+        }
+
+        // verify the compression method
+        let compression_method = match fixed_header[2] {
+           8 => CompressionMethod::Deflate,
+            other => return Err(GzipError::UnsupportedMethod(other))
+        };
+
+        // parse the flags
+        let flags = match fixed_header[3] {
+            raw_flags if raw_flags & 0xE0 != 0 =>  return Err(GzipError::ReservedFlags(raw_flags)),
+            raw_flags => Flags::from_bits_truncate(raw_flags),
+        };
+
+        // parse the modification time u32 (4 bytes)
+        let modification_time = fixed_header[4..8];
+        
+        // parse extra flags
+        let extra_flags = ExtraFlags::from(fixed_header[8]);
+
+        // parse operating system
+        let operating_system = OperatingSystem::from(fixed_header[9]);
+
+        // parse optional fields
+        let optionals = Optionals::try_from(flags)?;
+
+        todo!("need to finish the prasing Optionals")
+        
+    }
+}
+
+impl TryFrom<Flags> for Optionals {
+    type Error = GzipError;
+
+    fn try_from(value: Flags) -> Result<Self, Self::Error> {
+       let mut optionals = Optionals::default(); 
+    }
 }
 
 impl Parser<Start> {
