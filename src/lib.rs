@@ -21,7 +21,7 @@ use bitflags::bitflags;
 use crc::{CRC_32_ISO_HDLC, Crc};
 
 pub use error::{GzipError, GzipResult};
-pub use parser::{Decoder, HeaderParsed, Start};
+pub use parser::{Decoder, HeaderParsed, OptionalParsed, Start};
 
 pub const GZIP_CRC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 

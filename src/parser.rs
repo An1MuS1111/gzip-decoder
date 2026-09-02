@@ -1,18 +1,12 @@
 use crate::error::{GzipError, GzipResult};
 use crate::{
     CompressionMethod, ExtraFlags, Flags, GZIP_CRC, Header, ID1, ID2, OperatingSystem, Optionals,
-    Trailer,
 };
-use bitflags::Flag;
-use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
-use bytes::{Buf, Bytes, BytesMut};
+use byteorder::{ByteOrder, LittleEndian};
 use crc::Digest;
 use memchr::memchr;
-use miniz_oxide::inflate::decompress_to_vec;
 use static_str_ops::staticize;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
-use std::option;
+use std::io::BufRead;
 
 // pub struct Parser<S> {
 //     pub buf: Bytes,
