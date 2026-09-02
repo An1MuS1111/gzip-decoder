@@ -7,7 +7,7 @@ pub enum GzipError {
     Io(#[from] io::Error),
 
     #[error("Unexpected EOF: {err}")]
-    UnexpectedEof { err: String },
+    UnexpectedEof { err: &'static str },
 
     #[error("Invalid GZIP magic bytes: expected [0x1F, 0x8B], found [0x{0:02X}, 0x{1:02X}]")]
     InvalidMagic(u8, u8),

@@ -14,13 +14,14 @@
 /// |     CRC32     |     ISIZE     |         (8-byte Trailer)
 /// +---+---+---+---+---+---+---+---+
 pub mod error;
+pub mod helper;
 pub mod parser;
 
 use bitflags::bitflags;
 use crc::{CRC_32_ISO_HDLC, Crc};
 
 pub use error::{GzipError, GzipResult};
-pub use parser::{HeaderParsed, Parser, Start};
+pub use parser::{Decoder, HeaderParsed, Start};
 
 pub const GZIP_CRC: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
 
@@ -127,23 +128,10 @@ pub struct Header {
     pub modification_time: u32,
     pub extra_flags: ExtraFlags,
     pub os: OperatingSystem,
-    pub optionals: Optionals,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Trailer {
     pub crc32: u32,
     pub isize: u32,
-}
-
-/// Compute standard CRC-32
-#[inline]
-pub fn crc32(data: &[u8]) -> u32 {
-    GZIP_CRC.checksum(data)
-}
-
-/// Compute Header CRC-16 (least-significant 16 bits of CRC-32)
-#[inline]
-pub fn header_crc16(header_bytes: &[u8]) -> u16 {
-    (GZIP_CRC.checksum(header_bytes) & 0xFFFF) as u16
 }
