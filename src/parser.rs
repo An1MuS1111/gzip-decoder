@@ -119,15 +119,7 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
 
         // FEXTRA: Extra field
         if flags.contains(Flags::FEXTRA) {
-            let mut xlen_buf = [0u8; 2];
-            self.reader.read_exact(&mut xlen_buf)?;
-            self.state.fhcrc.update(&xlen_buf);
-
-            let xlen = LittleEndian::read_u16(&xlen_buf) as usize;
-            self.buf.resize(xlen, 0);
-            self.reader.read_exact(&mut self.buf)?;
-            self.state.fhcrc.update(&self.buf);
-            optionals.extra = Some(self.buf.clone());
+            optionals.extra = self.read_fhcrc()?;
         }
 
         // FNAME: Original filename
@@ -144,20 +136,7 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
 
         // FHCRC: Header CRC-16
         if flags.contains(Flags::FHCRC) {
-            let mut fhcrc_buf = [0u8; 2];
-            self.reader.read_exact(&mut fhcrc_buf)?;
-
-            let expected = u16::from_le_bytes(fhcrc_buf);
-            let calculated = (self.state.fhcrc.finalize() & 0xFFFF) as u16;
-
-            if expected != calculated {
-                return Err(GzipError::HeaderCrcMismatch {
-                    expected,
-                    calculated,
-                });
-            }
-
-            optionals.header_crc = Some(calculated);
+            optionals.header_crc = self.verify_headercrc16()?;
         }
 
         Ok(Decoder {
@@ -170,20 +149,35 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
         })
     }
 
-    fn read_fhcrc(&mut self) -> GzipResult<Vec<u8>> {
-        if self.state.header.flags.contains(Flags::FEXTRA) {
-            let mut xlen_buf = [0u8; 2];
-            self.reader.read_exact(&mut xlen_buf)?;
-            self.state.fhcrc.update(&xlen_buf);
+    #[inline]
+    fn read_fhcrc(&mut self) -> GzipResult<Option<Vec<u8>>> {
+        let mut xlen_buf = [0u8; 2];
+        self.reader.read_exact(&mut xlen_buf)?;
+        self.state.fhcrc.update(&xlen_buf);
 
-            let xlen = LittleEndian::read_u16(&xlen_buf) as usize;
-            self.buf.resize(xlen, 0);
-            self.reader.read_exact(&mut self.buf)?;
-            self.state.fhcrc.update(&self.buf);
-            Ok(self.buf.clone())
-        } else {
-            todo!()
+        let xlen = LittleEndian::read_u16(&xlen_buf) as usize;
+        self.buf.resize(xlen, 0);
+        self.reader.read_exact(&mut self.buf)?;
+        self.state.fhcrc.update(&self.buf);
+        Ok(Some(self.buf.clone()))
+    }
+
+    #[inline]
+    fn verify_headercrc16(&mut self) -> GzipResult<Option<u16>> {
+        let mut fhcrc_buf = [0u8; 2];
+        self.reader.read_exact(&mut fhcrc_buf)?;
+
+        let expected = u16::from_le_bytes(fhcrc_buf);
+        let calculated = (self.state.fhcrc.clone().finalize() & 0xFFFF) as u16;
+
+        if expected != calculated {
+            return Err(GzipError::HeaderCrcMismatch {
+                expected,
+                calculated,
+            });
         }
+
+        Ok(Some(calculated))
     }
 
     // reads the latin1 string from the buffer
