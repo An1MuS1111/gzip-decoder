@@ -29,7 +29,7 @@ pub struct HeaderParsed /* state_2 */ {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OptionalParsed {
+pub struct OptionalParsed /* state_3 */ {
     pub header: Header,
     pub optionals: Optionals,
 }
@@ -150,14 +150,14 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
             let expected = u16::from_le_bytes(fhcrc_buf);
             let calculated = (self.state.fhcrc.finalize() & 0xFFFF) as u16;
 
-            optionals.header_crc = Some(calculated);
-
             if expected != calculated {
                 return Err(GzipError::HeaderCrcMismatch {
                     expected,
                     calculated,
                 });
             }
+
+            optionals.header_crc = Some(calculated);
         }
 
         Ok(Decoder {
@@ -168,6 +168,22 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
             },
             buf: self.buf,
         })
+    }
+
+    fn read_fhcrc(&mut self) -> GzipResult<Vec<u8>> {
+        if self.state.header.flags.contains(Flags::FEXTRA) {
+            let mut xlen_buf = [0u8; 2];
+            self.reader.read_exact(&mut xlen_buf)?;
+            self.state.fhcrc.update(&xlen_buf);
+
+            let xlen = LittleEndian::read_u16(&xlen_buf) as usize;
+            self.buf.resize(xlen, 0);
+            self.reader.read_exact(&mut self.buf)?;
+            self.state.fhcrc.update(&self.buf);
+            Ok(self.buf.clone())
+        } else {
+            todo!()
+        }
     }
 
     // reads the latin1 string from the buffer
@@ -188,7 +204,7 @@ impl<R: BufRead> Decoder<R, HeaderParsed> {
                 // ...AND the null terminator that was consumed but not stored
                 self.state.fhcrc.update(b"\0");
                 self.buf.extend_from_slice(&buf[..pos]);
-                // Advance past '\0' will update in the crc later
+                // Advance past '\0'
                 self.reader.consume(pos + 1);
                 break;
             } else {
