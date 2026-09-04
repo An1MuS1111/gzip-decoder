@@ -13,9 +13,9 @@
 /// +=======================================+
 /// |     CRC32     |     ISIZE     |         (8-byte Trailer)
 /// +---+---+---+---+---+---+---+---+
+pub mod deflate;
 pub mod error;
 pub mod helper;
-pub mod lz77;
 pub mod parser;
 
 use bitflags::bitflags;
